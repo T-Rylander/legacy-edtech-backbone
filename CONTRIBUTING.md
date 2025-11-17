@@ -88,6 +88,6 @@ Thank you for your interest in contributing! This project welcomes contributions
 
 - Open an issue for bugs or feature requests
 - Start a discussion for questions
-- Tag [@MTRad_vis](https://twitter.com/MTRad_vis) on X/Twitter
+- Check [Troubleshooting guide](docs/10-troubleshooting.md) first
 
 Thank you for contributing! 🚀

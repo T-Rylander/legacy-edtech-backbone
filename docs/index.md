@@ -2,14 +2,14 @@
 
 ## Project Overview
 
-Welcome to the **Legacy EdTech Backbone** documentation. This project demonstrates how small MSPs and school IT departments can build enterprise-grade edtech services using repurposed hardware and lean automation.
+**Legacy EdTech Backbone** is a zero-touch IT stack for edtech-print bundles: Samba AD Domain Controller + PXE imaging on repurposed hardware. Built for operational reality—stable auth for print services, automated lab deployments, and resilient infrastructure without vendor lock-in.
 
-## Why This Project?
+## Why This Stack?
 
-- **Cost-Effective**: Repurpose Z390 workstations and Raspberry Pi devices instead of expensive servers
+- **Cost-Effective**: Z390 workstations and Raspberry Pi devices instead of expensive servers (<$1,000 total)
 - **Zero-Touch Deployment**: Image 50+ devices in an afternoon with PXE network boot
-- **Production-Ready**: Real-world configurations tested in edtech environments
-- **Open Source**: MIT licensed, fork-friendly, and documented for learning
+- **Production-Tested**: Real-world configurations for edtech environments
+- **Modular & Documented**: MkDocs site with tested commands and troubleshooting guides
 
 ## Quick Links
 
@@ -55,55 +55,56 @@ Welcome to the **Legacy EdTech Backbone** documentation. This project demonstrat
 graph TD
     A[Internet] -->|DDNS| B[UniFi USG-3P]
     B --> C[UniFi Cloud Key]
-    B --> D[Z390 Samba DC]
-    B --> E[Raspberry Pi 5 osTicket]
+    B --> D[Z390 Samba DC + PXE]
+    B --> E[Pi5 osTicket]
     D -->|LDAP Auth| F[Client Devices]
     D -->|PXE Boot| F
-    E -->|Helpdesk| G[Staff/Users]
+    E -->|Tickets| G[Staff/Users]
     C -->|Management| B
 ```
 
-## Three-Phase Approach
+## Three-Pillar Architecture
 
-### Phase 1: Foundation (Weeks 1-2)
-Build stable network and authentication infrastructure:
+### Pillar 1: Foundation (Network & Auth Core) - ~80% Complete
+Stable authentication and network infrastructure:
 
-- Samba AD Domain Controller on Z390
-- UniFi network with DDNS
-- Basic security hardening (UFW, fail2ban)
-- **Goal**: 50-user auth latency <50ms
+- **Samba AD DC** on Z390 (RFC2307 POSIX, RAID1-backed)
+- **UniFi network** with DDNS (Cloud Key, USG-3P, switches, APs)
+- **osTicket on Pi5** for lightweight helpdesk
+- **Goal**: <50ms auth latency, tested client joins
 
-### Phase 2: Automation (Weeks 3-4)
-Implement zero-touch deployment workflows:
+### Pillar 2: Automation (Imaging Workflows) - In Progress
+Zero-touch deployment system:
 
-- PXE network boot server
-- Golden Windows 11 EDU and Ubuntu images
-- Auto-domain join scripts
-- **Goal**: <30 min deploy time per device
+- **PXE proxy** on Z390 (dnsmasq/iPXE)
+- **Golden images** (Win11 EDU, Ubuntu preseed)
+- **USG DHCP options** (66/67 for chainload)
+- **Auto-domain join** scripts
+- **Goal**: 30-min deploys, 80% auto-success rate
 
-### Phase 3: Scale (Weeks 5+)
-Add monitoring and operational tools:
+### Pillar 3: Resilience & Scale - Planned
+Operational hardening and scale prep:
 
-- osTicket helpdesk on Pi 5
-- Prometheus + Grafana dashboards
-- Automated backup procedures
-- **Goal**: 20% service upsell rate
+- **Automated backups** (cron'd, offline Samba dumps)
+- **Security hardening** (UFW, fail2ban, health scripts)
+- **Future**: Multi-DC (Pi5 secondary), IaC (Ansible port)
+- **Goal**: SPOF alerts, easy disaster recovery
 
 ## Getting Started
 
-Ready to dive in? Here's the recommended path:
+Recommended path through the documentation:
 
-1. **Review** [Hardware Specs](01-hardware-specs.md) to verify your equipment
-2. **Follow** [OS Installation](02-os-install.md) to prepare the Z390
-3. **Provision** [Samba AD DC](03-samba-provision.md) for domain services
-4. **Configure** [Security & Monitoring](05-security-monitoring.md) for hardening
-5. **Deploy** [PXE Setup](08-pxe-setup.md) for mass imaging
+1. **[Hardware Specs](01-hardware-specs.md)** - Verify Z390 BIOS, CPU baseline (lscpu)
+2. **[OS Installation](02-os-install.md)** - Ubuntu 24.04 + RAID1 setup
+3. **[Samba AD DC](03-samba-provision.md)** - Domain provision with `./scripts/provision-dc.sh`
+4. **[Security Hardening](05-security-monitoring.md)** - UFW rules, fail2ban
+5. **[PXE Setup](08-pxe-setup.md)** - Network boot server for imaging
 
 ## Community & Support
 
 - **GitHub Issues**: [Report bugs or request features](https://github.com/T-Rylander/legacy-edtech-backbone/issues)
-- **Twitter/X**: Follow [@MTRad_vis](https://twitter.com/MTRad_vis) for updates
-- **Contributing**: See [README.md](https://github.com/T-Rylander/legacy-edtech-backbone) for guidelines
+- **Contributing**: See [CONTRIBUTING.md](https://github.com/T-Rylander/legacy-edtech-backbone/blob/main/CONTRIBUTING.md)
+- **Troubleshooting**: [Common issues guide](10-troubleshooting.md)
 
 ## License
 
@@ -111,4 +112,5 @@ This project is licensed under the MIT License. See the [LICENSE](https://github
 
 ---
 
+**Current Status**: Pillar 1 (Foundation) ~80% complete | PXE scripting in progress  
 **Ready to build?** Start with [Hardware Specs →](01-hardware-specs.md)

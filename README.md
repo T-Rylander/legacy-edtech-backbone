@@ -1,37 +1,37 @@
 # Legacy EdTech Backbone
 
-**Zero-Touch EdTech Stack on Repurposed Gear**
+**Zero-Touch IT Stack for EdTech-Print Bundles**
 
-An open-source IT infrastructure project demonstrating how small MSPs and school IT departments can build enterprise-grade edtech services using repurposed hardware and lean automation.
+Samba AD Domain Controller + PXE imaging on repurposed hardware. Built for operational reality—stable auth for print bundles, zero-touch imaging for lab rollouts.
 
 ## 🎯 Project Goals
 
-- **Repurposed Hardware First**: Z390 workstation as AD DC, Raspberry Pi 5 for helpdesk
-- **Zero-Touch Deployment**: PXE network boot for mass imaging (50+ devices in an afternoon)
-- **Human-Led Resilience**: Validate demand via pilots, automate grunt work, scale without vendor sprawl
-- **Open Documentation**: MkDocs site with practical guides, config snippets, and decision rationale
+- **Repurposed Hardware**: Z390 workstation as AD DC, Raspberry Pi 5 for osTicket
+- **Zero-Touch Deployment**: PXE network boot for mass imaging (30-min deploys, auto-domain join)
+- **Operational Resilience**: RAID1-backed storage, automated backups, health monitoring
+- **Modular Documentation**: MkDocs site with practical guides and tested configurations
 
 ## 🏗️ Architecture Overview
 
 ### Three Pillars
 
-1. **Network & Authentication** (Weeks 1-2)
-   - Samba AD Domain Controller (Z390, Ubuntu 24.04 LTS)
-   - UniFi Cloud Key + USG-3P + switches + APs
-   - DDNS for remote access (No-IP)
-   - Target: 50-user auth latency <50ms
+**Pillar 1: Foundation - Network & Auth Core** (~80% Complete)
+- Samba AD Domain Controller (Z390, Ubuntu 24.04 LTS, RFC2307 POSIX)
+- UniFi infrastructure (Cloud Key, USG-3P, switches, APs with DDNS)
+- Pi5 osTicket for lightweight ticketing
+- **Goal**: <50ms auth latency, client joins tested
 
-2. **Imaging & Automation** (Weeks 3-4)
-   - PXE proxy server (dnsmasq + iPXE)
-   - Golden images (Windows 11 EDU, Ubuntu)
-   - Auto-domain join via scripts
-   - Target: <30 min deploy time per machine
+**Pillar 2: Automation - Imaging Workflows**
+- PXE proxy on Z390 (dnsmasq/iPXE, NFS-locked images)
+- Golden WIMs (Win11 EDU first, Ubuntu preseed second)
+- USG DHCP options (66/67) for chainload
+- **Goal**: 30-min deploys, 80% auto-success rate
 
-3. **Monitoring & Scale** (Weeks 5+)
-   - osTicket on Raspberry Pi 5
-   - Uptime Kuma + Prometheus alerts
-   - Fail2ban + UFW hardening
-   - Target: 20% print upsell, 5+ LinkedIn leads/quarter
+**Pillar 3: Resilience & Scale**
+- RAID1 for Samba storage, cron'd backups
+- UFW hardening, fail2ban, health scripts
+- Future: Multi-DC (Pi5 secondary), IaC (Ansible port)
+- **Goal**: SPOF alerts, easy disaster recovery
 
 ## 🚀 Quick Start
 
@@ -40,30 +40,36 @@ An open-source IT infrastructure project demonstrating how small MSPs and school
 git clone https://github.com/T-Rylander/legacy-edtech-backbone.git
 cd legacy-edtech-backbone
 
-# Copy environment template
-cp .env.example .env
-# Edit .env with your secrets (ADMIN_PASSWORD, REALM, etc.)
+# Populate secrets
+cp .env.example .env && vim .env
+# Set: REALM=LEGACYEDTECH.LOCAL, ADMIN_PASSWORD, DC_IP, etc.
 
-# Run DC provisioning script
+# Provision DC (includes optional PXE flag)
 sudo ./scripts/provision-dc.sh
 
-# View documentation site locally
-mkdocs serve
-# Open http://localhost:8000
+# Preview documentation
+mkdocs serve  # http://localhost:8000
 ```
+
+**Phases**: [Foundation](docs/01-hardware-specs.md) → [Automation](docs/08-pxe-setup.md) → [Resilience](docs/04-backup-dr.md)
 
 ## 📚 Documentation
 
+**Foundation (Pillar 1)**
 - [Hardware Specs](docs/01-hardware-specs.md) - Z390 BIOS, Pi5 setup, CPU baselines
 - [OS Installation](docs/02-os-install.md) - Ubuntu 24.04 + RAID1 setup
 - [Samba AD DC](docs/03-samba-provision.md) - Domain provisioning, client joins
+- [UniFi Setup](docs/06-unifi-setup.md) - Cloud Key, USG DHCP options
+- [osTicket on Pi](docs/07-osticket-pi.md) - Raspberry Pi 5 helpdesk
+
+**Automation (Pillar 2)**
+- [PXE Setup](docs/08-pxe-setup.md) - Network boot server (dnsmasq/iPXE)
+- [Image Management](docs/09-image-management.md) - WIM capture, golden images
+
+**Resilience (Pillar 3)**
 - [Backup & DR](docs/04-backup-dr.md) - Offline backups, restore procedures
 - [Security & Monitoring](docs/05-security-monitoring.md) - UFW, fail2ban, health checks
-- [UniFi Setup](docs/06-unifi-setup.md) - Cloud Key, USG DHCP options
-- [osTicket on Pi](docs/07-osticket-pi.md) - Raspberry Pi 5 helpdesk deployment
-- [PXE Setup](docs/08-pxe-setup.md) - Network boot server configuration
-- [Image Management](docs/09-image-management.md) - WIM capture, golden images
-- [Social Playbook](docs/10-social-playbook.md) - LinkedIn/X content templates
+- [Troubleshooting](docs/10-troubleshooting.md) - Common issues, emergency procedures
 
 Full documentation: [GitHub Pages](https://t-rylander.github.io/legacy-edtech-backbone/)
 
@@ -88,10 +94,10 @@ legacy-edtech-backbone/
 
 ## 🎓 Who This Is For
 
-- **Small MSPs** pivoting to edtech services
-- **School IT departments** with limited budgets
-- **Technical users** comfortable with CLI and Linux
-- **Systems administrators** looking for hands-on infrastructure examples
+- **School IT departments** needing zero-touch lab imaging
+- **Small MSPs** offering bundled edtech + print services
+- **Systems administrators** building lean AD/PXE infrastructure
+- **Technical learners** wanting hands-on domain controller experience
 
 ## 🤝 Contributing
 
@@ -104,12 +110,12 @@ This project welcomes contributions! See our documentation for:
 
 MIT License - See LICENSE file for details
 
-## 🔗 Connect
+## 🔗 Issues & Questions
 
-- Twitter/X: [@MTRad_vis](https://twitter.com/MTRad_vis)
-- LinkedIn: [Share your deployment stories]
-- Issues: [Report bugs or request features](https://github.com/T-Rylander/legacy-edtech-backbone/issues)
+- **Bugs/Features**: [GitHub Issues](https://github.com/T-Rylander/legacy-edtech-backbone/issues)
+- **Documentation**: [All Guides](https://t-rylander.github.io/legacy-edtech-backbone/)
+- **Contributions**: See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
-**Built with ❤️ for the edtech community** | Powered by repurposed hardware and open-source tools
+**Status**: Foundation (Pillar 1) ~80% complete | PXE scripting in progress

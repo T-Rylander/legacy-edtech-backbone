@@ -1,5 +1,5 @@
 site_name: Legacy EdTech Backbone
-site_description: Zero-Touch EdTech Stack on Repurposed Gear
+site_description: Zero-Touch IT Stack for EdTech-Print Bundles
 site_author: T-Rylander
 site_url: https://t-rylander.github.io/legacy-edtech-backbone/
 
@@ -55,29 +55,23 @@ plugins:
 
 nav:
   - Home: index.md
-  - Getting Started:
+  - Foundation (Pillar 1):
     - Hardware Specs: 01-hardware-specs.md
     - OS Installation: 02-os-install.md
-  - Core Services:
     - Samba AD DC: 03-samba-provision.md
-    - Backup & DR: 04-backup-dr.md
-    - Security & Monitoring: 05-security-monitoring.md
-  - Network Infrastructure:
     - UniFi Setup: 06-unifi-setup.md
     - osTicket on Pi: 07-osticket-pi.md
-  - Imaging & Deployment:
+  - Automation (Pillar 2):
     - PXE Setup: 08-pxe-setup.md
     - Image Management: 09-image-management.md
-  - Operations:
-    - Social Playbook: 10-social-playbook.md
+  - Resilience (Pillar 3):
+    - Backup & DR: 04-backup-dr.md
+    - Security & Monitoring: 05-security-monitoring.md
+    - Troubleshooting: 10-troubleshooting.md
 
 extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/T-Rylander
-    - icon: fontawesome/brands/twitter
-      link: https://twitter.com/MTRad_vis
-    - icon: fontawesome/brands/linkedin
-      link: https://www.linkedin.com/in/t-rylander/
 
 copyright: Copyright &copy; 2025 T-Rylander | MIT License
