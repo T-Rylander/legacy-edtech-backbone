@@ -1,0 +1,82 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Secrets and credentials
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+
+# Samba backups (store elsewhere)
+/etc/samba/smb.conf
+/var/lib/samba/private/*
+*.tdb
+*.ldb
+
+# ISO images and large binaries
+*.iso
+*.img
+*.wim
+*.vhd
+*.vhdx
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+*.bak
+
+# MkDocs site build
+site/
+.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Editor directories
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Backup files
+backup/
+*.backup
+*.bk
+
+# Database dumps
+*.sql
+*.dump
+
+# Archive files
+*.tar.gz
+*.zip
+*.7z
+*.rar

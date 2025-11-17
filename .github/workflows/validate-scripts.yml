@@ -1,0 +1,85 @@
+name: Validate Scripts
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'scripts/**/*.sh'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'scripts/**/*.sh'
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './scripts'
+          severity: warning
+          ignore_paths: '**/*.example'
+      
+      - name: Verify script permissions
+        run: |
+          echo "Checking script execute permissions..."
+          for script in scripts/*.sh; do
+            if [[ ! -x "$script" ]]; then
+              echo "❌ $script is not executable"
+              exit 1
+            else
+              echo "✅ $script is executable"
+            fi
+          done
+
+  syntax-check:
+    name: Bash Syntax Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Check bash syntax
+        run: |
+          echo "Checking bash syntax for all scripts..."
+          for script in scripts/*.sh; do
+            bash -n "$script"
+            if [[ $? -eq 0 ]]; then
+              echo "✅ $script - syntax OK"
+            else
+              echo "❌ $script - syntax error"
+              exit 1
+            fi
+          done
+
+  doc-links:
+    name: Check Documentation Links
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install MkDocs
+        run: |
+          pip install mkdocs-material pymdown-extensions
+      
+      - name: Build documentation
+        run: mkdocs build --strict
+      
+      - name: Check for broken links
+        run: |
+          echo "Documentation built successfully"
+          echo "Site preview available after merge at GitHub Pages"

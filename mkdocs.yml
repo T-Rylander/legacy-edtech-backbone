@@ -1,0 +1,83 @@
+site_name: Legacy EdTech Backbone
+site_description: Zero-Touch EdTech Stack on Repurposed Gear
+site_author: T-Rylander
+site_url: https://t-rylander.github.io/legacy-edtech-backbone/
+
+repo_name: T-Rylander/legacy-edtech-backbone
+repo_url: https://github.com/T-Rylander/legacy-edtech-backbone
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Hardware Specs: 01-hardware-specs.md
+    - OS Installation: 02-os-install.md
+  - Core Services:
+    - Samba AD DC: 03-samba-provision.md
+    - Backup & DR: 04-backup-dr.md
+    - Security & Monitoring: 05-security-monitoring.md
+  - Network Infrastructure:
+    - UniFi Setup: 06-unifi-setup.md
+    - osTicket on Pi: 07-osticket-pi.md
+  - Imaging & Deployment:
+    - PXE Setup: 08-pxe-setup.md
+    - Image Management: 09-image-management.md
+  - Operations:
+    - Social Playbook: 10-social-playbook.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/T-Rylander
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/MTRad_vis
+    - icon: fontawesome/brands/linkedin
+      link: https://www.linkedin.com/in/t-rylander/
+
+copyright: Copyright &copy; 2025 T-Rylander | MIT License
