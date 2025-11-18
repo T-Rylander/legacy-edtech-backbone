@@ -42,6 +42,8 @@ set +a
 : "${DOMAIN:?Error: DOMAIN not set in .env}"
 : "${ADMIN_PASSWORD:?Error: ADMIN_PASSWORD not set in .env}"
 : "${DNS_FORWARDER:?Error: DNS_FORWARDER not set in .env}"
+# Optional: DC_IP (used for iPXE HTTP and NFS references)
+DC_IP=${DC_IP:-$(hostname -I | awk '{print $1}')}
 
 echo -e "${GREEN}Starting Samba AD DC Provisioning${NC}"
 echo "Realm: $REALM"
@@ -174,7 +176,7 @@ if [[ "$ENABLE_PXE" =~ ^[Yy]$ ]]; then
     # Create directory structure
     echo -e "${YELLOW}[PXE 3/10] Creating directory structure...${NC}"
     mkdir -p /srv/tftp/images/{windows,linux}
-    mkdir -p /srv/images
+    mkdir -p /srv/images /srv/images/linux/ubuntu
     chown -R tftp:tftp /srv/tftp
     chmod 755 /srv/images
     
@@ -252,7 +254,7 @@ item --key l local Boot Local Disk
 choose target || goto local
 
 :ubuntu
-set nfs-server 192.168.1.11
+set nfs-server DC_IP_HERE
 set nfs-path /srv/images/linux/ubuntu
 kernel nfs://${nfs-server}${nfs-path}/casper/vmlinuz boot=casper netboot=nfs nfsroot=${nfs-server}:${nfs-path} || goto shell
 initrd nfs://${nfs-server}${nfs-path}/casper/initrd || goto shell
@@ -265,6 +267,7 @@ shell
 sanboot --no-describe --drive 0x80 || exit
 EOF
     chmod 644 /srv/tftp/boot.ipxe
+    sed -i "s/DC_IP_HERE/${DC_IP}/g" /srv/tftp/boot.ipxe
     
     # Auto-detect network interface
     echo -e "${YELLOW}[PXE 7/10] Configuring dnsmasq proxy...${NC}"
@@ -277,21 +280,22 @@ EOF
     fi
     
     # Configure dnsmasq as PXE proxy
-    cat > /etc/dnsmasq.d/pxe.conf <<EOF
+    cat > /etc/dnsmasq.d/pxe.conf <<'EOF'
 interface=${INTERFACE}
 bind-interfaces
 dhcp-range=192.168.1.0,proxy
 dhcp-boot=tag:!ipxe,undionly.kpxe
-dhcp-boot=tag:ipxe,http://192.168.1.11/boot.ipxe
+dhcp-boot=tag:ipxe,http://DC_IP_HERE/boot.ipxe
 enable-tftp
 tftp-root=/srv/tftp
 log-dhcp
 EOF
+    sed -i "s/DC_IP_HERE/${DC_IP}/g" /etc/dnsmasq.d/pxe.conf
     
     # Configure NFS exports (subnet-restricted)
     echo -e "${YELLOW}[PXE 8/10] Configuring NFS exports...${NC}"
-    if ! grep -q "/srv/images" /etc/exports; then
-        echo "/srv/images 192.168.1.0/24(ro,sync,no_subtree_check,no_root_squash)" >> /etc/exports
+    if ! grep -q "/srv/images/linux/ubuntu" /etc/exports; then
+        echo "/srv/images/linux/ubuntu 192.168.1.0/24(ro,sync,no_subtree_check,no_root_squash)" >> /etc/exports
     fi
     exportfs -ra
     
@@ -356,8 +360,8 @@ EOF
     echo ""
     echo "Monitor logs: sudo tail -f /var/log/syslog | grep -E 'dnsmasq|tftp|nginx'"
     echo "NFS status: sudo showmount -e localhost"
-    echo "TFTP test: tftp 192.168.1.11 -c get undionly.kpxe /tmp/test"
-    echo "HTTP test: curl -I http://192.168.1.11/boot.ipxe"
+    echo "TFTP test: tftp ${DC_IP} -c get undionly.kpxe /tmp/test"
+    echo "HTTP test: curl -I http://${DC_IP}/boot.ipxe"
     echo ""
     echo "Next steps:"
     echo "1. Configure USG DHCP options:"

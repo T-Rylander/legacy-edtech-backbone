@@ -43,6 +43,18 @@ sudo tail -f /var/log/syslog | grep -E 'dnsmasq|nginx'
 
 The script validates HTTP during provisioning—if it fails, iPXE chainloading won't work.
 
+## Populate Ubuntu ISO (for NFS boot)
+
+To boot Ubuntu Live over NFS, extract an Ubuntu ISO into `/srv/images/linux/ubuntu`
+so `casper/vmlinuz` and `casper/initrd` are present. You can use the helper script:
+
+```bash
+sudo ./scripts/fix-pxe-loop.sh /path/to/ubuntu-24.04-desktop-amd64.iso
+```
+
+Or let it download automatically (no arg). After extraction, the script also ensures
+an NFS export for `/srv/images/linux/ubuntu` and regenerates the iPXE menu.
+
 ## Install dnsmasq
 
 ```bash
