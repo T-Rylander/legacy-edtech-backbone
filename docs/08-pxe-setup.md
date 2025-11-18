@@ -1,19 +1,3 @@
-# PXE Network Boot Setup
-
-## Overview
-
-Configure PXE server on Z390 for zero-touch imaging of client devices.
-
-## Storage Device
-
-The provisioning script mounts `/srv/images` from a dedicated disk. Set the block
-device via `IMAGES_DISK` in your `.env` (defaults to `/dev/sdb1`). The disk must
-be formatted as ext4.
-
-Example overrides:
-
-```bash
-export IMAGES_DISK=/dev/sdd1
 # PXE Network Boot (iPXE + nginx + NFS)
 
 ## Overview
@@ -82,7 +66,7 @@ EOF
 sudo chmod 644 /srv/tftp/boot.ipxe
 ```
 
-## dnsmasq (PXE Proxy)
+## dnsmasq (PXE Proxy, BIOS + UEFI)
 
 ```bash
 IFACE=$(ip -o link show up | awk -F': ' '{print $2}' | grep -v lo | head -1)
@@ -90,8 +74,25 @@ sudo tee /etc/dnsmasq.d/pxe.conf > /dev/null <<EOF
 interface=${IFACE}
 bind-interfaces
 dhcp-range=192.168.1.0,proxy
-dhcp-boot=tag:!ipxe,undionly.kpxe
+
+# Identify client architecture
+dhcp-match=set:bios,option:client-arch,0
+dhcp-match=set:efi32,option:client-arch,6
+dhcp-match=set:efi64,option:client-arch,7
+dhcp-match=set:efibc,option:client-arch,9
+
+# Detect iPXE second stage
+dhcp-userclass=set:ipxe,iPXE
+
+# Second-stage iPXE fetches HTTP menu
 dhcp-boot=tag:ipxe,http://DC_IP_HERE/boot.ipxe
+
+# First-stage bootloaders via TFTP
+dhcp-boot=tag:bios,undionly.kpxe
+dhcp-boot=tag:efi32,ipxe.efi
+dhcp-boot=tag:efi64,ipxe.efi
+dhcp-boot=tag:efibc,ipxe.efi
+
 enable-tftp
 tftp-root=/srv/tftp
 log-dhcp
@@ -142,7 +143,7 @@ sudo ufw reload
 
 ```bash
 # HTTP chainload (should be 200 OK)
-
+curl -I http://DC_IP_HERE/boot.ipxe
 
 # TFTP quick test
 tftp DC_IP_HERE -c get undionly.kpxe /tmp/test && rm /tmp/test
@@ -196,40 +197,6 @@ Set DHCP options on the LAN network:
 - Option 67 (Boot Filename): `undionly.kpxe`
 
 Apply and wait for provisioning, then PXE boot a client (F12) to verify the iPXE menu appears.
-
----
-
-**Next**: [Image Management →](09-image-management.md)
-# Create menu directory
-sudo mkdir -p /srv/tftp/pxelinux.cfg
-```
-
-## Configure PXE Menu
-
-```bash
-sudo tee /srv/tftp/pxelinux.cfg/default << 'EOF'
-DEFAULT menu.c32
-PROMPT 0
-TIMEOUT 300
-
-MENU TITLE Legacy EdTech PXE Boot
-
-LABEL local
-  MENU LABEL ^Boot from Local Disk
-  LOCALBOOT 0
-
-LABEL win11-install
-  MENU LABEL Windows 11 EDU Install
-  KERNEL memdisk
-  INITRD images/win11.iso
-  APPEND iso raw
-
-LABEL ubuntu-install
-  MENU LABEL Ubuntu 24.04 Install
-  KERNEL ubuntu/vmlinuz
-  APPEND initrd=ubuntu/initrd boot=casper netboot=nfs nfsroot=192.168.1.10:/srv/nfs/ubuntu
-EOF
-```
 
 ---
 

@@ -42,6 +42,7 @@ fi
 ENV_FILE="$(dirname "$0")/../.env"
 if [[ -f "$ENV_FILE" ]]; then
     set -a
+    # shellcheck source=/dev/null
     source "$ENV_FILE"
     set +a
 fi

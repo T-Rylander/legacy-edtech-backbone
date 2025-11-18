@@ -34,6 +34,7 @@ fi
 
 # Source .env
 set -a
+# shellcheck source=/dev/null
 source "$ENV_FILE"
 set +a
 
@@ -279,13 +280,30 @@ EOF
         echo -e "${GREEN}Detected interface: $INTERFACE${NC}"
     fi
     
-    # Configure dnsmasq as PXE proxy
-    cat > /etc/dnsmasq.d/pxe.conf <<'EOF'
+    # Configure dnsmasq as PXE proxy (BIOS + UEFI aware)
+    cat > /etc/dnsmasq.d/pxe.conf <<EOF
 interface=${INTERFACE}
 bind-interfaces
 dhcp-range=192.168.1.0,proxy
-dhcp-boot=tag:!ipxe,undionly.kpxe
+
+# Identify client architecture
+dhcp-match=set:bios,option:client-arch,0
+dhcp-match=set:efi32,option:client-arch,6
+dhcp-match=set:efi64,option:client-arch,7
+dhcp-match=set:efibc,option:client-arch,9
+
+# Detect iPXE second stage
+dhcp-userclass=set:ipxe,iPXE
+
+# Second-stage iPXE fetches HTTP menu
 dhcp-boot=tag:ipxe,http://DC_IP_HERE/boot.ipxe
+
+# First-stage bootloaders via TFTP
+dhcp-boot=tag:bios,undionly.kpxe
+dhcp-boot=tag:efi32,ipxe.efi
+dhcp-boot=tag:efi64,ipxe.efi
+dhcp-boot=tag:efibc,ipxe.efi
+
 enable-tftp
 tftp-root=/srv/tftp
 log-dhcp

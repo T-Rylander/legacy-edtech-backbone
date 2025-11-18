@@ -16,6 +16,7 @@ fi
 
 # Load .env for DC_IP and IMAGES_DISK
 ENV_FILE="${BASH_SOURCE%/*}/../.env"
+# shellcheck source=/dev/null
 if [[ -f "$ENV_FILE" ]]; then set -a; source "$ENV_FILE"; set +a; fi
 DC_IP=${DC_IP:-$(hostname -I | awk '{print $1}')}
 
@@ -98,21 +99,35 @@ ln -sf /etc/nginx/sites-available/pxe /etc/nginx/sites-enabled/pxe
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl restart nginx
 
-if ! grep -q "dhcp-boot=tag:ipxe,http://" /etc/dnsmasq.d/pxe.conf; then
-  INTERFACE=$(ip -o link show up | awk -F': ' '{print $2}' | grep -v lo | head -1)
-  cat > /etc/dnsmasq.d/pxe.conf <<EOF
+INTERFACE=$(ip -o link show up | awk -F': ' '{print $2}' | grep -v lo | head -1)
+cat > /etc/dnsmasq.d/pxe.conf <<EOF
 interface=${INTERFACE}
 bind-interfaces
 dhcp-range=192.168.1.0,proxy
-dhcp-boot=tag:!ipxe,undionly.kpxe
+
+# Identify client architecture
+dhcp-match=set:bios,option:client-arch,0
+dhcp-match=set:efi32,option:client-arch,6
+dhcp-match=set:efi64,option:client-arch,7
+dhcp-match=set:efibc,option:client-arch,9
+
+# Detect iPXE second stage
+dhcp-userclass=set:ipxe,iPXE
+
+# Second-stage iPXE fetches HTTP menu
 dhcp-boot=tag:ipxe,http://DC_IP_HERE/boot.ipxe
+
+# First-stage bootloaders via TFTP
+dhcp-boot=tag:bios,undionly.kpxe
+dhcp-boot=tag:efi32,ipxe.efi
+dhcp-boot=tag:efi64,ipxe.efi
+dhcp-boot=tag:efibc,ipxe.efi
+
 enable-tftp
 tftp-root=/srv/tftp
 log-dhcp
 EOF
-fi
-sed -i "s#http://.*:/boot.ipxe#http://${DC_IP}/boot.ipxe#g" /etc/dnsmasq.d/pxe.conf || true
-sed -i "s#http://DC_IP_HERE/boot.ipxe#http://${DC_IP}/boot.ipxe#g" /etc/dnsmasq.d/pxe.conf || true
+sed -i "s/DC_IP_HERE/${DC_IP}/g" /etc/dnsmasq.d/pxe.conf
 systemctl restart dnsmasq
 
 # 5) Validation
