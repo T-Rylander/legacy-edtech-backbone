@@ -42,10 +42,13 @@ cd legacy-edtech-backbone
 
 # Populate secrets
 cp .env.example .env && vim .env
-# Set: REALM=LEGACYEDTECH.LOCAL, ADMIN_PASSWORD, DC_IP, etc.
+# Set: REALM, DOMAIN, ADMIN_PASSWORD, DNS_FORWARDER, DC_IP, IMAGES_DISK
 
 # Provision DC (includes optional PXE flag)
 sudo ./scripts/provision-dc.sh
+
+# Populate Ubuntu ISO for NFS boot (optional helper)
+sudo ./scripts/fix-pxe-loop.sh   # or pass a local ISO path
 
 # Preview documentation
 mkdocs serve  # http://localhost:8000
@@ -63,7 +66,7 @@ mkdocs serve  # http://localhost:8000
 - [osTicket on Pi](docs/07-osticket-pi.md) - Raspberry Pi 5 helpdesk
 
 **Automation (Pillar 2)**
-- [PXE Setup](docs/08-pxe-setup.md) - Network boot server (dnsmasq/iPXE)
+- [PXE Setup](docs/08-pxe-setup.md) - iPXE + nginx + NFS (proxy DHCP)
 - [Image Management](docs/09-image-management.md) - WIM capture, golden images
 
 **Resilience (Pillar 3)**
@@ -80,11 +83,12 @@ legacy-edtech-backbone/
 ├── docs/                      # MkDocs documentation source
 ├── scripts/                   # Bash automation scripts
 │   ├── provision-dc.sh       # Samba AD DC setup
+│   ├── fix-pxe-loop.sh       # Populate Ubuntu ISO, regenerate iPXE, validate
 │   ├── raid-setup.sh         # RAID1 mirror configuration
 │   ├── prep-win11-image.sh   # Windows 11 image preparation
 │   ├── health-check.sh       # System health monitoring
 │   ├── backup-samba.sh       # Automated AD backups
-│   └── update-pxe-menu.sh    # PXE boot menu generation
+│   └── update-pxe-menu.sh    # PXE boot menu generation (legacy)
 ├── .github/workflows/        # CI/CD automation
 │   └── validate-scripts.yml  # Shellcheck validation
 ├── mkdocs.yml               # Documentation site config
