@@ -152,16 +152,23 @@ if [[ "$ENABLE_PXE" =~ ^[Yy]$ ]]; then
     echo -e "${YELLOW}[PXE 1/10] Installing PXE packages...${NC}"
     apt install -y dnsmasq tftpd-hpa nfs-kernel-server wget
     
-    # Prereq: Check /dev/sdd1 existence and format
+    # Prereq: Dynamic images disk detection (defaults to /dev/sdb1)
     echo -e "${YELLOW}[PXE 2/10] Checking storage prerequisites...${NC}"
-    if [[ ! -b /dev/sdd1 ]]; then
-        echo -e "${RED}ERROR: /dev/sdd1 missing—partition and format your HDD first${NC}"
-        echo "Example: sudo fdisk /dev/sdd && sudo mkfs.ext4 /dev/sdd1"
-        exit 1
-    fi
-    if ! blkid /dev/sdd1 | grep -q ext4; then
-        echo -e "${RED}ERROR: /dev/sdd1 not ext4—format with 'sudo mkfs.ext4 /dev/sdd1'${NC}"
-        exit 1
+    if mountpoint -q /srv/images; then
+        CURRENT_DEV=$(mount | awk '$3=="/srv/images"{print $1}')
+        echo -e "${GREEN}/srv/images already mounted on ${CURRENT_DEV}—skipping device checks${NC}"
+        IMAGES_DISK="${IMAGES_DISK:-$CURRENT_DEV}"
+    else
+        IMAGES_DISK="${IMAGES_DISK:-/dev/sdb1}"
+        if [[ ! -b "$IMAGES_DISK" ]]; then
+            echo -e "${RED}ERROR: Images disk $IMAGES_DISK missing—attach/format the drive or set IMAGES_DISK${NC}"
+            echo "Example: export IMAGES_DISK=/dev/sdd1"
+            exit 1
+        fi
+        if ! blkid "$IMAGES_DISK" | grep -q ext4; then
+            echo -e "${RED}ERROR: $IMAGES_DISK not ext4—format with 'sudo mkfs.ext4 $IMAGES_DISK'${NC}"
+            exit 1
+        fi
     fi
     
     # Create directory structure
@@ -175,15 +182,16 @@ if [[ "$ENABLE_PXE" =~ ^[Yy]$ ]]; then
     echo -e "${YELLOW}[PXE 4/10] Mounting image storage...${NC}"
     if ! mountpoint -q /srv/images; then
         if ! grep -q "/srv/images" /etc/fstab; then
-            echo "/dev/sdd1 /srv/images ext4 defaults 0 2" >> /etc/fstab
+            echo "$IMAGES_DISK /srv/images ext4 defaults 0 2" >> /etc/fstab
         fi
         mount /srv/images || {
             echo -e "${RED}ERROR: Failed to mount /srv/images${NC}"
             exit 1
         }
-        echo -e "${GREEN}Mounted /srv/images${NC}"
+        echo -e "${GREEN}Mounted /srv/images from ${IMAGES_DISK}${NC}"
     else
-        echo -e "${GREEN}/srv/images already mounted${NC}"
+        CURRENT_DEV=$(mount | awk '$3=="/srv/images"{print $1}')
+        echo -e "${GREEN}/srv/images already mounted on ${CURRENT_DEV}${NC}"
     fi
     
     # Download iPXE binaries

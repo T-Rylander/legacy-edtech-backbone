@@ -4,6 +4,21 @@
 
 Configure PXE server on Z390 for zero-touch imaging of client devices.
 
+## Storage Device
+
+The provisioning script mounts `/srv/images` from a dedicated disk. Set the block
+device via `IMAGES_DISK` in your `.env` (defaults to `/dev/sdb1`). The disk must
+be formatted as ext4.
+
+Example overrides:
+
+```bash
+export IMAGES_DISK=/dev/sdd1
+sudo ./scripts/provision-dc.sh
+```
+
+If `/srv/images` is already mounted, the script detects it and skips remounting.
+
 ## Install dnsmasq
 
 ```bash
