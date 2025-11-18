@@ -190,6 +190,14 @@ sudo ./scripts/fix-pxe-loop.sh
 
 The script also ensures the NFS export and regenerates `boot.ipxe` with `DC_IP`.
 
+Tip: You can override the ISO source via `UBUNTU_ISO_URL` in `.env`. The default
+uses the noble 24.04.1 release:
+
+```bash
+export UBUNTU_ISO_URL=https://releases.ubuntu.com/noble/ubuntu-24.04.1-desktop-amd64.iso
+sudo ./scripts/fix-pxe-loop.sh
+```
+
 ## UniFi DHCP Options (USG)
 
 Set DHCP options on the LAN network:

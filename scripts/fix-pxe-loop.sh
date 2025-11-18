@@ -22,8 +22,9 @@ DC_IP=${DC_IP:-$(hostname -I | awk '{print $1}')}
 
 UBUNTU_DIR="/srv/images/linux/ubuntu"
 ISO_ARG="${1:-}"
-ISO_URL=${UBUNTU_ISO_URL:-"https://releases.ubuntu.com/24.04/ubuntu-24.04-desktop-amd64.iso"}
-TMP_ISO="/tmp/ubuntu-24.04-desktop-amd64.iso"
+# Prefer numbered noble release path; can override via UBUNTU_ISO_URL in .env
+ISO_URL=${UBUNTU_ISO_URL:-"https://releases.ubuntu.com/noble/ubuntu-24.04.1-desktop-amd64.iso"}
+TMP_ISO="/tmp/ubuntu-24.04.1-desktop-amd64.iso"
 MNT="/mnt/ubuntu-iso"
 
 mkdir -p "$UBUNTU_DIR" "$MNT"
@@ -34,11 +35,29 @@ if [[ ! -f "$UBUNTU_DIR/casper/vmlinuz" || ! -f "$UBUNTU_DIR/casper/initrd" ]]; 
   if [[ -n "$ISO_ARG" && -f "$ISO_ARG" ]]; then
     ISO_PATH="$ISO_ARG"
   else
-    echo -e "${YELLOW}Downloading Ubuntu ISO (can override with local path arg)...${NC}"
-    curl -L -o "$TMP_ISO" "$ISO_URL"
+    echo -e "${YELLOW}Downloading Ubuntu 24.04.1 LTS ISO (~6GB)...${NC}"
+    if ! curl -L -o "$TMP_ISO" "$ISO_URL"; then
+      echo -e "${RED}ERROR: Download failed. Check URL or network: $ISO_URL${NC}"
+      exit 1
+    fi
+    # Validate size > 5GB to avoid saving an HTML error page
+    ISO_SIZE=$(stat -f%z "$TMP_ISO" 2>/dev/null || stat -c%s "$TMP_ISO" 2>/dev/null || echo 0)
+    if [[ "$ISO_SIZE" -lt 5000000000 ]]; then
+      echo -e "${RED}ERROR: Downloaded file too small (${ISO_SIZE} bytes). Likely an error page.${NC}"
+      echo "URL: $ISO_URL"
+      rm -f "$TMP_ISO"
+      exit 1
+    fi
+    echo -e "${GREEN}Download complete (${ISO_SIZE} bytes).${NC}"
     ISO_PATH="$TMP_ISO"
   fi
-  mount -o loop "$ISO_PATH" "$MNT"
+  # Clean any existing mounts and mount read-only
+  umount "$MNT" 2>/dev/null || true
+  mount -o loop,ro "$ISO_PATH" "$MNT" || {
+    echo -e "${RED}ERROR: Failed to mount ISO. It may be corrupted.${NC}"
+    echo "Try removing $TMP_ISO and re-running."
+    exit 1
+  }
   rsync -a --delete "$MNT/" "$UBUNTU_DIR/"
   umount "$MNT"
   [[ -f "$TMP_ISO" ]] && rm -f "$TMP_ISO"
