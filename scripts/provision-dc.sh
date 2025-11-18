@@ -195,7 +195,7 @@ if [[ "$ENABLE_PXE" =~ ^[Yy]$ ]]; then
     fi
     
     # Download iPXE binaries
-    echo -e "${YELLOW}[PXE 5/10] Downloading iPXE binaries...${NC}"
+    echo -e "${YELLOW}[PXE 5/10] Downloading iPXE binaries and HTTP server...${NC}"
     if [[ ! -f /srv/tftp/undionly.kpxe ]]; then
         wget -q -O /srv/tftp/undionly.kpxe http://boot.ipxe.org/undionly.kpxe || {
             echo -e "${RED}ERROR: iPXE download failed—check network connectivity${NC}"
@@ -207,6 +207,37 @@ if [[ "$ENABLE_PXE" =~ ^[Yy]$ ]]; then
     else
         echo -e "${GREEN}iPXE binaries already present${NC}"
     fi
+    
+    # Install nginx for HTTP chainloading (iPXE needs HTTP to fetch boot.ipxe)
+    if ! command -v nginx &>/dev/null; then
+        apt install -y nginx
+        echo -e "${GREEN}nginx installed${NC}"
+    else
+        echo -e "${GREEN}nginx already installed${NC}"
+    fi
+    
+    # Configure nginx to serve /srv/tftp over HTTP
+    cat > /etc/nginx/sites-available/pxe <<'NGINXEOF'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    root /srv/tftp;
+    server_name _;
+    
+    location / {
+        autoindex on;
+    }
+    
+    location ~ \.ipxe$ {
+        add_header Content-Type application/ipxe;
+    }
+}
+NGINXEOF
+    
+    ln -sf /etc/nginx/sites-available/pxe /etc/nginx/sites-enabled/
+    rm -f /etc/nginx/sites-enabled/default
+    nginx -t && systemctl enable --now nginx
+    echo -e "${GREEN}nginx configured for iPXE HTTP chainload${NC}"
     
     # Create iPXE boot menu
     echo -e "${YELLOW}[PXE 6/10] Creating iPXE boot menu...${NC}"
@@ -267,6 +298,7 @@ EOF
     # Configure firewall
     echo -e "${YELLOW}[PXE 9/10] Configuring firewall rules...${NC}"
     ufw allow from 192.168.1.0/24 to any port 69 proto udp comment 'TFTP'
+    ufw allow from 192.168.1.0/24 to any port 80 proto tcp comment 'iPXE HTTP'
     ufw allow from 192.168.1.0/24 to any port 2049 proto tcp comment 'NFS'
     ufw allow from 192.168.1.0/24 to any port 111 proto tcp comment 'RPC'
     ufw allow from 192.168.1.0/24 to any port 111 proto udp comment 'RPC'
@@ -274,13 +306,13 @@ EOF
     
     # Start services with rollback on failure
     echo -e "${YELLOW}[PXE 10/10] Starting PXE services...${NC}"
-    systemctl enable --now dnsmasq tftpd-hpa nfs-kernel-server
+    systemctl enable --now dnsmasq tftpd-hpa nfs-kernel-server nginx
     sleep 2
     
-    if ! systemctl is-active --quiet dnsmasq tftpd-hpa nfs-kernel-server; then
+    if ! systemctl is-active --quiet dnsmasq tftpd-hpa nfs-kernel-server nginx; then
         echo -e "${RED}ERROR: Service start failed—rolling back...${NC}"
-        systemctl stop dnsmasq tftpd-hpa nfs-kernel-server
-        rm -f /etc/dnsmasq.d/pxe.conf
+        systemctl stop dnsmasq tftpd-hpa nfs-kernel-server nginx
+        rm -f /etc/dnsmasq.d/pxe.conf /etc/nginx/sites-enabled/pxe
         exportfs -ra
         exit 1
     fi
@@ -303,6 +335,13 @@ EOF
         echo -e "${YELLOW}Warning: TFTP test failed${NC}"
     fi
     
+    echo -n "  HTTP chainload: "
+    if curl -sf http://localhost/boot.ipxe >/dev/null 2>&1; then
+        echo -e "${GREEN}OK${NC}"
+    else
+        echo -e "${RED}FAILED (iPXE will retry-loop without HTTP)${NC}"
+    fi
+    
     echo -n "  dnsmasq proxy: "
     if systemctl is-active --quiet dnsmasq; then
         echo -e "${GREEN}OK${NC}"
@@ -315,9 +354,10 @@ EOF
     echo -e "${GREEN}PXE Stack Provisioned!${NC}"
     echo -e "${GREEN}==================================${NC}"
     echo ""
-    echo "Monitor logs: sudo tail -f /var/log/syslog | grep -E 'dnsmasq|tftp'"
+    echo "Monitor logs: sudo tail -f /var/log/syslog | grep -E 'dnsmasq|tftp|nginx'"
     echo "NFS status: sudo showmount -e localhost"
     echo "TFTP test: tftp 192.168.1.11 -c get undionly.kpxe /tmp/test"
+    echo "HTTP test: curl -I http://192.168.1.11/boot.ipxe"
     echo ""
     echo "Next steps:"
     echo "1. Configure USG DHCP options:"

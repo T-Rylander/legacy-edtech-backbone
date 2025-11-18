@@ -19,6 +19,30 @@ sudo ./scripts/provision-dc.sh
 
 If `/srv/images` is already mounted, the script detects it and skips remounting.
 
+## HTTP Server for iPXE Chainloading
+
+**Critical**: iPXE requires HTTP to fetch `boot.ipxe` after loading from TFTP. The
+provisioning script installs nginx to serve `/srv/tftp` over port 80.
+
+Without HTTP:
+- TFTP delivers `undionly.kpxe` successfully
+- iPXE loads but fails to fetch `boot.ipxe` (connection refused)
+- Client retries PXE boot indefinitely (retry loop)
+
+Validation:
+```bash
+# Test HTTP chainload (should return 200 OK)
+curl -I http://192.168.1.11/boot.ipxe
+
+# Check nginx status
+sudo systemctl status nginx
+
+# Monitor PXE flow with HTTP visibility
+sudo tail -f /var/log/syslog | grep -E 'dnsmasq|nginx'
+```
+
+The script validates HTTP during provisioning—if it fails, iPXE chainloading won't work.
+
 ## Install dnsmasq
 
 ```bash
