@@ -137,16 +137,188 @@ fi
 
 echo ""
 echo -e "${GREEN}==================================${NC}"
-echo -e "${GREEN}Provisioning Complete!${NC}"
+echo -e "${GREEN}Samba AD DC Provisioning Complete!${NC}"
 echo -e "${GREEN}==================================${NC}"
 echo ""
 echo "Domain: $DOMAIN"
 echo "Realm: $REALM"
 echo "Administrator Password: (see .env file)"
 echo ""
-echo "Next steps:"
-echo "1. Update firewall: sudo ufw allow 53,88,389,445/tcp"
-echo "2. Configure DNS on clients to point to this server"
-echo "3. Join Windows/Linux clients to domain"
-echo "4. Create OUs and users with samba-tool"
+
+# PXE Service Setup (Optional)
+echo ""
+read -p "Enable PXE imaging stack? (y/N): " ENABLE_PXE
+if [[ "$ENABLE_PXE" =~ ^[Yy]$ ]]; then
+    echo -e "${YELLOW}[PXE 1/10] Installing PXE packages...${NC}"
+    apt install -y dnsmasq tftpd-hpa nfs-kernel-server wget
+    
+    # Prereq: Check /dev/sdd1 existence and format
+    echo -e "${YELLOW}[PXE 2/10] Checking storage prerequisites...${NC}"
+    if [[ ! -b /dev/sdd1 ]]; then
+        echo -e "${RED}ERROR: /dev/sdd1 missing—partition and format your HDD first${NC}"
+        echo "Example: sudo fdisk /dev/sdd && sudo mkfs.ext4 /dev/sdd1"
+        exit 1
+    fi
+    if ! blkid /dev/sdd1 | grep -q ext4; then
+        echo -e "${RED}ERROR: /dev/sdd1 not ext4—format with 'sudo mkfs.ext4 /dev/sdd1'${NC}"
+        exit 1
+    fi
+    
+    # Create directory structure
+    echo -e "${YELLOW}[PXE 3/10] Creating directory structure...${NC}"
+    mkdir -p /srv/tftp/images/{windows,linux}
+    mkdir -p /srv/images
+    chown -R tftp:tftp /srv/tftp
+    chmod 755 /srv/images
+    
+    # Mount images HDD (idempotent)
+    echo -e "${YELLOW}[PXE 4/10] Mounting image storage...${NC}"
+    if ! mountpoint -q /srv/images; then
+        if ! grep -q "/srv/images" /etc/fstab; then
+            echo "/dev/sdd1 /srv/images ext4 defaults 0 2" >> /etc/fstab
+        fi
+        mount /srv/images || {
+            echo -e "${RED}ERROR: Failed to mount /srv/images${NC}"
+            exit 1
+        }
+        echo -e "${GREEN}Mounted /srv/images${NC}"
+    else
+        echo -e "${GREEN}/srv/images already mounted${NC}"
+    fi
+    
+    # Download iPXE binaries
+    echo -e "${YELLOW}[PXE 5/10] Downloading iPXE binaries...${NC}"
+    if [[ ! -f /srv/tftp/undionly.kpxe ]]; then
+        wget -q -O /srv/tftp/undionly.kpxe http://boot.ipxe.org/undionly.kpxe || {
+            echo -e "${RED}ERROR: iPXE download failed—check network connectivity${NC}"
+            exit 1
+        }
+        wget -q -O /srv/tftp/ipxe.efi http://boot.ipxe.org/ipxe.efi
+        chown tftp:tftp /srv/tftp/*.kpxe /srv/tftp/*.efi
+        echo -e "${GREEN}iPXE binaries downloaded${NC}"
+    else
+        echo -e "${GREEN}iPXE binaries already present${NC}"
+    fi
+    
+    # Create iPXE boot menu
+    echo -e "${YELLOW}[PXE 6/10] Creating iPXE boot menu...${NC}"
+    cat > /srv/tftp/boot.ipxe <<'EOF'
+#!ipxe
+
+dhcp
+menu Legacy EdTech PXE Boot (Phase 1)
+item --key u ubuntu Ubuntu 24.04 Live (NFS)
+item --key s shell iPXE Shell
+item --key l local Boot Local Disk
+choose target || goto local
+
+:ubuntu
+set nfs-server 192.168.1.11
+set nfs-path /srv/images/linux/ubuntu
+kernel nfs://${nfs-server}${nfs-path}/casper/vmlinuz boot=casper netboot=nfs nfsroot=${nfs-server}:${nfs-path} || goto shell
+initrd nfs://${nfs-server}${nfs-path}/casper/initrd || goto shell
+boot || goto shell
+
+:shell
+shell
+
+:local
+sanboot --no-describe --drive 0x80 || exit
+EOF
+    chmod 644 /srv/tftp/boot.ipxe
+    
+    # Auto-detect network interface
+    echo -e "${YELLOW}[PXE 7/10] Configuring dnsmasq proxy...${NC}"
+    INTERFACE=$(ip -o link show up | awk -F': ' '{print $2}' | grep -v lo | head -1)
+    if [[ -z "$INTERFACE" ]]; then
+        INTERFACE=eth0
+        echo -e "${YELLOW}Warning: Could not auto-detect interface, using eth0${NC}"
+    else
+        echo -e "${GREEN}Detected interface: $INTERFACE${NC}"
+    fi
+    
+    # Configure dnsmasq as PXE proxy
+    cat > /etc/dnsmasq.d/pxe.conf <<EOF
+interface=${INTERFACE}
+bind-interfaces
+dhcp-range=192.168.1.0,proxy
+dhcp-boot=tag:!ipxe,undionly.kpxe
+dhcp-boot=tag:ipxe,http://192.168.1.11/boot.ipxe
+enable-tftp
+tftp-root=/srv/tftp
+log-dhcp
+EOF
+    
+    # Configure NFS exports (subnet-restricted)
+    echo -e "${YELLOW}[PXE 8/10] Configuring NFS exports...${NC}"
+    if ! grep -q "/srv/images" /etc/exports; then
+        echo "/srv/images 192.168.1.0/24(ro,sync,no_subtree_check,no_root_squash)" >> /etc/exports
+    fi
+    exportfs -ra
+    
+    # Configure firewall
+    echo -e "${YELLOW}[PXE 9/10] Configuring firewall rules...${NC}"
+    ufw allow from 192.168.1.0/24 to any port 69 proto udp comment 'TFTP'
+    ufw allow from 192.168.1.0/24 to any port 2049 proto tcp comment 'NFS'
+    ufw allow from 192.168.1.0/24 to any port 111 proto tcp comment 'RPC'
+    ufw allow from 192.168.1.0/24 to any port 111 proto udp comment 'RPC'
+    ufw reload
+    
+    # Start services with rollback on failure
+    echo -e "${YELLOW}[PXE 10/10] Starting PXE services...${NC}"
+    systemctl enable --now dnsmasq tftpd-hpa nfs-kernel-server
+    sleep 2
+    
+    if ! systemctl is-active --quiet dnsmasq tftpd-hpa nfs-kernel-server; then
+        echo -e "${RED}ERROR: Service start failed—rolling back...${NC}"
+        systemctl stop dnsmasq tftpd-hpa nfs-kernel-server
+        rm -f /etc/dnsmasq.d/pxe.conf
+        exportfs -ra
+        exit 1
+    fi
+    
+    # Validation checks
+    echo ""
+    echo -e "${GREEN}PXE Service Validation:${NC}"
+    echo -n "  NFS exports: "
+    if showmount -e localhost | grep -q /srv/images; then
+        echo -e "${GREEN}OK${NC}"
+    else
+        echo -e "${YELLOW}Warning: NFS export not visible${NC}"
+    fi
+    
+    echo -n "  TFTP access: "
+    if tftp localhost -c get undionly.kpxe /tmp/test.kpxe 2>/dev/null; then
+        echo -e "${GREEN}OK${NC}"
+        rm -f /tmp/test.kpxe
+    else
+        echo -e "${YELLOW}Warning: TFTP test failed${NC}"
+    fi
+    
+    echo -n "  dnsmasq proxy: "
+    if systemctl is-active --quiet dnsmasq; then
+        echo -e "${GREEN}OK${NC}"
+    else
+        echo -e "${RED}FAILED${NC}"
+    fi
+    
+    echo ""
+    echo -e "${GREEN}==================================${NC}"
+    echo -e "${GREEN}PXE Stack Provisioned!${NC}"
+    echo -e "${GREEN}==================================${NC}"
+    echo ""
+    echo "Monitor logs: sudo tail -f /var/log/syslog | grep -E 'dnsmasq|tftp'"
+    echo "NFS status: sudo showmount -e localhost"
+    echo "TFTP test: tftp 192.168.1.11 -c get undionly.kpxe /tmp/test"
+    echo ""
+    echo "Next steps:"
+    echo "1. Configure USG DHCP options:"
+    echo "   - Option 66 (TFTP Server): 192.168.1.11"
+    echo "   - Option 67 (Boot Filename): undionly.kpxe"
+    echo "2. Download Ubuntu 24.04 ISO and extract to /srv/images/linux/ubuntu"
+    echo "3. Test PXE boot on a client machine"
+    echo ""
+fi
+
+echo "All services configured!"
 echo ""
